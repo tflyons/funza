@@ -2,8 +2,6 @@ package funza
 
 import (
 	"fmt"
-	"log"
-	"runtime"
 
 	"github.com/pkg/errors"
 
@@ -11,6 +9,10 @@ import (
 	"gorgonia.org/tensor"
 )
 
+//NewLogRegression returns the scalar θ values for multivariable logarithmic regression
+//                         1
+//  Y = ----------------------------------------
+//       1 + exp(θ0 + θ1*x1 + ... + θN*xN)
 func NewLogRegression(xValues [][]float64, yValues []float64, opts ...Option) ([]float64, error) {
 	m := &modeler{
 		iter:    10000,
@@ -81,55 +83,6 @@ func NewLogRegression(xValues [][]float64, yValues []float64, opts ...Option) ([
 		return nil, errors.Wrap(err, "prediction division error")
 	}
 
-	// compare predicted with actual
-	se := gg.Must(gg.Square(gg.Must(gg.Sub(p, Y))))
-	cost := gg.Must(gg.Mean(se))
-
-	// back propagate data
-	if _, err := gg.Grad(cost, thetas...); err != nil {
-		return nil, errors.Wrap(err, "failed to propagate")
-	}
-
-	// new machine
-	var machine gg.VM
-	if m.useLisp {
-		machine = gg.NewLispMachine(graph, gg.BindDualValues(thetas...))
-	} else {
-		machine = gg.NewTapeMachine(graph, gg.BindDualValues(thetas...))
-	}
-	defer machine.Close()
-
 	// solve
-	return solve(machine, thetas, m.iter, m.solver)
-}
-
-func solve(machine gg.VM, thetas []*gg.Node, iter int, solver gg.Solver) ([]float64, error) {
-	model := make([]gg.ValueGrad, len(thetas))
-	for i := range model {
-		model[i] = thetas[i]
-	}
-
-	if gg.CUDA {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-	var err error
-	for i := 0; i < iter; i++ {
-		if err = machine.RunAll(); err != nil {
-			fmt.Printf("Error during iteration: %v: %v\n", i, err)
-			break
-		}
-
-		if err = solver.Step(model); err != nil {
-			log.Fatal(err)
-		}
-
-		machine.Reset() // Reset is necessary in a loop like this
-	}
-
-	thetaValues := make([]float64, len(thetas))
-	for i := range thetas {
-		thetaValues[i] = thetas[i].Value().Data().(float64)
-	}
-	return thetaValues, nil
+	return solve(graph, m, thetas, p, Y)
 }

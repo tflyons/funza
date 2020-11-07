@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ReadCSV reads float64 values from a csv file
 func ReadCSV(filename string, xHeaders []string, yHeader string) ([][]float64, []float64, error) {
 	// range of data
 	var xs [][]float64
