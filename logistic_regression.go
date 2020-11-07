@@ -15,9 +15,10 @@ import (
 //       1 + exp(θ0 + θ1*x1 + ... + θN*xN)
 func NewLogRegression(xValues [][]float64, yValues []float64, opts ...Option) ([]float64, error) {
 	m := &modeler{
-		iter:    10000,
-		solver:  gg.NewVanillaSolver(gg.WithLearnRate(0.1)),
-		useLisp: false,
+		iter:        10000,
+		solver:      gg.NewVanillaSolver(gg.WithLearnRate(0.1)),
+		useLisp:     false,
+		useConstant: true,
 	}
 
 	// replace defaults with options
@@ -39,9 +40,16 @@ func NewLogRegression(xValues [][]float64, yValues []float64, opts ...Option) ([
 	// get scalars for calculation
 	var thetas []*gg.Node
 
+	if m.useConstant {
+		xConstants := make([]float64, len(yValues))
+		for i := range xConstants {
+			xConstants[i] = 1.0
+		}
+		xValues = append([][]float64{xConstants}, xValues...)
+	}
+
 	// theta0 + theta1*X1 + theta2*X2
-	thetas = append(thetas, gg.NewScalar(graph, gg.Float64, gg.WithValue(1.0), gg.WithName("theta_0")))
-	exp := thetas[0]
+	var exp *gg.Node
 	for i, x := range xValues {
 		// vector node
 		X := gg.NewVector(graph, gg.Float64, gg.WithName(fmt.Sprintf("x_%d", i+1)), gg.WithShape(len(x)), gg.WithValue(
@@ -56,6 +64,12 @@ func NewLogRegression(xValues [][]float64, yValues []float64, opts ...Option) ([
 		mul, err := gg.Mul(X, theta)
 		if err != nil {
 			return nil, errors.Wrap(err, "x*theta multiplication error")
+		}
+
+		// init exp
+		if exp == nil {
+			exp = mul
+			continue
 		}
 
 		// exp += mul

@@ -51,10 +51,19 @@ func WithIterations(iter int) Option {
 	}
 }
 
+// WithoutConstant removes the constant value
+func WithoutConstant() Option {
+	return func(m *modeler) error {
+		m.useConstant = false
+		return nil
+	}
+}
+
 type modeler struct {
-	iter    int
-	solver  gg.Solver
-	useLisp bool
+	iter        int
+	solver      gg.Solver
+	useLisp     bool
+	useConstant bool
 }
 
 func solve(graph *gg.ExprGraph, m *modeler, thetas []*gg.Node, predicted, actual *gg.Node) ([]float64, error) {
